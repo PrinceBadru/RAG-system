@@ -1,0 +1,7 @@
+.env
+.venv
+./unused/*
+.claude
+__pycache__
+unused
+audit_notes/
