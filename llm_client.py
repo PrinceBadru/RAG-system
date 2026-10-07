@@ -1,33 +1,37 @@
 """
-Handles LLM inference via Hugging Face Serverless API (Cloud).
-Replaces the heavy local PyTorch pipeline with a lightweight API client.
+Handles LLM inference via Groq API (Cloud).
+Provides ultra-fast, free tier access to Llama 3 models.
 """
 import os
-from huggingface_hub import InferenceClient
+from groq import Groq
 from pdf_reader import PdfReader
 from local_embedding import LocalEmbedding
 
 class AiModel:
-    def __init__(self, model_name="Qwen/Qwen2.5-3B-Instruct"):
+    def __init__(self, model_name="qwen/qwen3.8-27b"):
         '''
-        Initializes the InferenceClient to talk to Hugging Face's hosted models.
+        Initializes the Groq API client.
         '''
         self.model_name = model_name
-        self.hf_token = os.environ.get("HF_TOKEN")
+        self.api_key = os.environ.get("GROQ_API_KEY")
         
-        if not self.hf_token:
-            print("WARNING: HF_TOKEN not found in environment variables. API calls may fail or be heavily rate-limited.")
+        if not self.api_key:
+            print("WARNING: GROQ_API_KEY not found in environment variables. API calls will fail.")
             
-        print(f"Connecting to Hugging Face Inference API for model: {self.model_name}")
-        # Initialize the lightweight client instead of downloading huge weights
-        self.client = InferenceClient(model=self.model_name, token=self.hf_token)
+        print(f"Connecting to Groq API for model: {self.model_name}")
+        # Initialize the lightweight client
+        self.client = Groq(api_key=self.api_key)
 
     def ask_a_question(self, prompt="Hello there!"):
         '''
         Basic question asking without RAG.
         '''
         messages = [{"role": "user", "content": prompt}]
-        response = self.client.chat_completion(messages=messages, max_tokens=1000)
+        response = self.client.chat.completions.create(
+            messages=messages,
+            model=self.model_name,
+            max_tokens=1000
+        )
         print(response.choices[0].message.content)
 
     def ask_a_question_from_pdf(self, pdf_path, prompt="tell me what is this pdf about"):
@@ -40,10 +44,14 @@ class AiModel:
         local_embedding = LocalEmbedding()
         local_embedding.build_index(pdf_paragraphs)
 
-        relevant_sections = local_embedding.get_context(prompt, 10)
+        relevant_sections = local_embedding.get_context(prompt, k=3)
         messages = self.build_messages(relevant_sections, prompt)
 
-        response = self.client.chat_completion(messages=messages, max_tokens=1000)
+        response = self.client.chat.completions.create(
+            messages=messages,
+            model=self.model_name,
+            max_tokens=1000
+        )
         print(response.choices[0].message.content)
 
     def ask_a_question_from_pdf_stream(self, pdf_path: str, prompt: str = "tell me what is this pdf about", local_embedding=None):
@@ -57,12 +65,13 @@ class AiModel:
             local_embedding.build_index(pdf_paragraphs)
 
         # ARCHITECTURE: VI[(Vector Index In-Memory)] -->|Top K Context| LC[LLM Client]
-        relevant_sections = local_embedding.get_context(prompt, k=10)
+        relevant_sections = local_embedding.get_context(prompt, k=3)
         messages = self.build_messages(relevant_sections, prompt)
 
-        # ARCHITECTURE: LC[LLM Client] -->|Prompt| HF((Hugging Face Serverless API))
-        stream = self.client.chat_completion(
+        # ARCHITECTURE: LC[LLM Client] -->|Prompt| Groq((Groq API))
+        stream = self.client.chat.completions.create(
             messages=messages, 
+            model=self.model_name,
             max_tokens=1000, 
             stream=True
         )

@@ -2,7 +2,7 @@
 Streamlit front-end for the local RAG pipeline.
 
 Lets the user upload any PDF, asks questions about it, and streams
-the answer token-by-token using the Hugging Face Serverless API (Cloud).
+the answer token-by-token using the Groq API (Cloud).
 
 Pipeline recap
 --------------
@@ -63,7 +63,7 @@ def load_ai_model() -> AiModel:
         @st.cache_resource returns the same instance on every subsequent call,
         so the LLM is never loaded more than once regardless of reruns.
     '''
-    load_dotenv()    # make HF_TOKEN available before AiModel.__init__ reads it
+    load_dotenv()    # make GROQ_API_KEY available before AiModel.__init__ reads it
     return AiModel()
 
 
@@ -87,7 +87,7 @@ def save_uploaded_pdf(uploaded_file) -> str:
 
 with st.sidebar:
     st.markdown("## 📄 RAG Assistant")
-    st.markdown("Ask questions about any PDF — powered by Hugging Face Cloud API.")
+    st.markdown("Ask questions about any PDF — powered by Groq Cloud API.")
     st.divider()
 
     # Model loading
@@ -152,7 +152,7 @@ with st.sidebar:
         st.info("Upload a PDF to get started.")
 
     st.divider()
-    st.caption("Powered by **Qwen2.5-3B-Instruct (Cloud)** + **MiniLM-L6-v2 (Local)**")
+    st.caption("Powered by **Qwen 3.8-27B (Cloud via Groq)** + **MiniLM-L6-v2 (Local)**")
 
 
 # ------------------------------------------------------------------
@@ -199,7 +199,7 @@ if prompt:
             prompt=prompt,
             local_embedding=st.session_state.local_embedding,
         )
-        # ARCHITECTURE: HF((Hugging Face Serverless API)) -->|Streamed Tokens| UI[Streamlit Web UI]
+        # ARCHITECTURE: Groq((Groq API)) -->|Streamed Tokens| UI[Streamlit Web UI]
         full_response = st.write_stream(response_stream)
 
     st.session_state.chat_history.append({"role": "assistant", "content": full_response})
