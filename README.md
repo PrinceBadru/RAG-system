@@ -1,11 +1,11 @@
 # RAG AI System — Hybrid Cloud-Local Architecture
 
-> A Retrieval-Augmented Generation (RAG) pipeline with a Streamlit chat UI — upload any PDF, ask questions in plain English, and get grounded, streamed answers. Uses local embeddings for speed and privacy, paired with Hugging Face's Cloud API for blazing-fast inference without needing a GPU!
+> A Retrieval-Augmented Generation (RAG) pipeline with a Streamlit chat UI — upload any PDF, ask questions in plain English, and get grounded, streamed answers. Uses local embeddings for speed and privacy, paired with Groq's ultra-fast Cloud API for instant inference without needing a GPU!
 
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-UI-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
-[![HuggingFace](https://img.shields.io/badge/HuggingFace-Serverless_API-FFD21E?logo=huggingface&logoColor=black)](https://huggingface.co/)
-[![Model](https://img.shields.io/badge/Model-Qwen2.5--3B--Instruct-a78bfa)](https://huggingface.co/Qwen/Qwen2.5-3B-Instruct)
+[![Groq](https://img.shields.io/badge/Groq-Cloud_API-F55036?logo=groq&logoColor=white)](https://groq.com/)
+[![Model](https://img.shields.io/badge/Model-Qwen_3.8--27B-a78bfa)](https://huggingface.co/Qwen/Qwen2.5-3B-Instruct)
 
 ---
 
@@ -15,12 +15,12 @@ RAG AI System is a hybrid Retrieval-Augmented Generation pipeline that lets you 
 
 By adopting a hybrid approach, we get the best of both worlds:
 1. **Local Embeddings:** A MiniLM embedding model converts your document into semantic vectors and searches them using a pure-Python in-memory index on your local machine.
-2. **Cloud Inference:** Instead of downloading 7GB of weights and struggling with CUDA/GPU issues, the lightweight `llm_client.py` uses Hugging Face's Serverless API to generate answers instantly.
+2. **Cloud Inference:** Instead of downloading 7GB of weights and struggling with CUDA/GPU issues, the lightweight `llm_client.py` uses the Groq API to generate answers instantly.
 
 | File | Responsibility |
 |---|---|
 | `main.py` | Streamlit UI — chat interface, file upload, streaming output |
-| `llm_client.py` | `AiModel` — connects to Hugging Face Inference API, streams token output |
+| `llm_client.py` | `AiModel` — connects to Groq API, streams token output |
 | `local_embedding.py` | `LocalEmbedding` — MiniLM wrapper and vector index interface |
 | `vector_index.py` | `VectorIndex` — pure-stdlib in-memory cosine/Euclidean vector store |
 | `pdf_reader.py` | `PdfReader` — PDF text extraction and paragraph splitting |
@@ -31,7 +31,7 @@ By adopting a hybrid approach, we get the best of both worlds:
 
 ### Upload screen — Ready State
 ![Upload screen](application_screenshots/image_2.png)
-The interface highlights the new Privacy Guarantee and the connection to the Hugging Face Cloud API.
+The interface highlights the new Privacy Guarantee and the connection to the Groq Cloud API.
 
 ### Active conversation
 ![Chat screen](application_screenshots/image.png)
@@ -52,7 +52,7 @@ The assistant streams answers retrieved from the local embedding index, powered 
 - Strict grounding prompt — the model is instructed to answer only from the provided document text
 
 ### Cloud-Powered Streaming Output
-- Uses `huggingface_hub.InferenceClient` for fast, serverless inference.
+- Uses `groq` SDK for fast, serverless inference.
 - Tokens are yielded directly from the API without blocking the Streamlit main thread.
 - `st.write_stream()` renders tokens progressively as they arrive in the browser.
 
@@ -67,7 +67,7 @@ The assistant streams answers retrieved from the local embedding index, powered 
 1. **PDF → Paragraphs** — `PdfReader` reads every page, normalises whitespace, and splits on paragraph breaks.
 2. **Paragraphs → Vectors** — `LocalEmbedding.build_index()` batch-embeds all paragraphs using a local `all-MiniLM-L6-v2` model.
 3. **Question → Context** — at query time the question is embedded locally and compared against every stored vector by cosine distance; the top-k highest-scoring chunks are retrieved.
-4. **Context + Question → Answer** — `AiModel` wraps the context and question in a strict RAG prompt and fires it off to the **Hugging Face Cloud API**, streaming the result back to your screen.
+4. **Context + Question → Answer** — `AiModel` wraps the context and question in a strict RAG prompt and fires it off to the **Groq API**, streaming the result back to your screen.
 
 ---
 
@@ -102,7 +102,7 @@ The assistant streams answers retrieved from the local embedding index, powered 
                           │ top-k chunks
             ┌─────────────▼──────────────┐
             │       AiModel (Client)      │
-            │  HF Serverless API (CLOUD) │
+            │       Groq API (CLOUD)      │
             │  Sends RAG prompt over HTTP │
             └─────────────┬──────────────┘
                           │ token stream
@@ -121,33 +121,35 @@ The assistant streams answers retrieved from the local embedding index, powered 
 | Requirement | Notes |
 |---|---|
 | Python 3.10+ | Earlier versions not tested |
-| Hugging Face account | **Required** for the `.env` `HF_TOKEN` to use the free cloud API |
+| Groq account | **Required** for the `.env` `GROQ_API_KEY` to use the free cloud API |
 
 ### Setup
 
 ```bash
 # Clone the repository
-git clone https://github.com/Mohamad-Hachem/RAG_AI_SYSTEM.git
-cd RAG_AI_SYSTEM
+git clone https://github.com/PrinceBadru/RAG-system.git
+cd RAG-system
 
 # Create and activate a virtual environment
 python -m venv .venv
-source .venv/Scripts/activate   # Windows (Git Bash)
-# source .venv/bin/activate     # macOS / Linux
+# Windows (PowerShell/Command Prompt)
+.\.venv\Scripts\activate   
+# macOS / Linux
+# source .venv/bin/activate     
 
-# Install dependencies (no heavy PyTorch + CUDA required for the LLM anymore!)
-pip install transformers streamlit pypdf python-dotenv huggingface_hub torch
+# Install dependencies
+pip install -r requirements.txt
 ```
 
-### Add your Hugging Face token
+### Add your API keys
 
 Create a `.env` file in the project root:
 
 ```
-HF_TOKEN=hf_your_token_here
+GROQ_API_KEY=gsk_your_groq_api_key_here
 ```
 
-Get a free token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens). This is strictly required to query the cloud models.
+Get a free token at [console.groq.com/keys](https://console.groq.com/keys). This is strictly required to query the cloud models. Note: You might also need a Hugging Face token in the `.env` if your local embeddings require authenticated downloads.
 
 ---
 
@@ -172,7 +174,6 @@ Streamlit will print a local URL (default `http://localhost:8501`). Open it in y
 
 ## Limitations
 
-- **Cloud Data Transfer & Privacy** — Your PDF text chunks leave your machine to be processed by the Hugging Face API. However, we rely on **Zero Data Retention (ZDR)** API policies, meaning your data is encrypted in transit (HTTPS), processed in memory, and instantly deleted without being stored or used for training.
+- **Cloud Data Transfer & Privacy** — Your PDF text chunks leave your machine to be processed by the Groq API. However, we rely on **Zero Data Retention (ZDR)** API policies, meaning your data is encrypted in transit (HTTPS), processed in memory, and instantly deleted without being stored or used for training.
 - **Single document at a time** — the index holds one PDF; there is no multi-document or cross-document Q&A.
-- **API Rate Limits** — Since we rely on Hugging Face's free tier, you may encounter rate-limiting if you ask too many questions rapidly.
 - **In-memory index only** — `VectorIndex` is not persisted to disk; re-uploading the same PDF re-embeds it from scratch on every run.
