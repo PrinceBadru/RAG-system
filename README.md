@@ -156,7 +156,11 @@ Get a free token at [console.groq.com/keys](https://console.groq.com/keys). This
 ## Usage
 
 ```bash
+# If your virtual environment is activated:
 streamlit run main.py
+
+# Or run it directly without activating the environment (Windows):
+.\.venv\Scripts\python.exe -m streamlit run main.py
 ```
 
 Streamlit will print a local URL (default `http://localhost:8501`). Open it in your browser.
