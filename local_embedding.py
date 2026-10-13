@@ -1,25 +1,29 @@
 """
-Local sentence embeddings using transformers + torch.
-Replicates sentence-transformers/all-MiniLM-L6-v2 behaviour without
-requiring the sentence-transformers package.
+Enterprise Local Embedding Engine using Hugging Face transformers + torch.
+Replicates sentence-transformers/all-MiniLM-L6-v2 behavior locally without
+requiring sentence-transformers or third-party cloud embedding APIs.
 
-Output: L2-normalised float32 vectors of dimension 384,
-compatible with cosine similarity search in VectorIndex.
+Output: L2-normalized float32 vectors of dimension 384, compatible with
+cosine similarity search in VectorIndex.
 """
 
+from typing import List, Dict, Any, Union, Tuple
 import torch
 from transformers import AutoTokenizer, AutoModel
 from vector_index import VectorIndex
 
 
 class LocalEmbedding:
-
-    def __init__(self, model_name: str = "sentence-transformers/all-MiniLM-L6-v2", distance_metric: str = "cosine",):
+    def __init__(
+        self,
+        model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
+        distance_metric: str = "cosine",
+    ):
         """
-        Initialise the embedding model and an empty vector index.
+        Initialise the local embedding model and in-memory vector index.
 
         Args:
-            model_name:      HuggingFace model ID to load locally.
+            model_name:      Hugging Face model ID to load locally.
             distance_metric: Distance metric for the index ('cosine' or 'euclidean').
         """
         self.model_name = model_name
@@ -32,7 +36,10 @@ class LocalEmbedding:
         self.model.eval()
         print("[LocalEmbedding] Model ready.")
 
-        self.store = VectorIndex(distance_metric=distance_metric, embedding_fn=self._embed_one,)
+        self.store = VectorIndex(
+            distance_metric=distance_metric,
+            embedding_fn=self._embed_one,
+        )
 
     # ------------------------------------------------------------------
     # Private helpers
@@ -41,33 +48,17 @@ class LocalEmbedding:
     def _mean_pool(self, last_hidden_state: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
         """
         Compute attention-mask-weighted mean over token embeddings.
-
-        Padding tokens are zeroed out via the mask so they don't
-        influence the sentence-level representation.
-
-        Args:
-            last_hidden_state: shape (batch, seq_len, hidden_size)
-            attention_mask:    shape (batch, seq_len)
-
-        Returns:
-            Tensor of shape (batch, hidden_size)
+        Padding tokens are zeroed out via the mask.
         """
         mask_expanded = attention_mask.unsqueeze(-1).float()
         sum_embeddings = (last_hidden_state * mask_expanded).sum(dim=1)
         token_counts = mask_expanded.sum(dim=1).clamp(min=1e-9)
         return sum_embeddings / token_counts
 
-    def _embed_one(self, text: str) -> list[float]:
+    def _embed_one(self, text: str) -> List[float]:
         """
-        Embed a single string and return it as a plain Python list.
-
-        Used internally by VectorIndex to embed query strings at search time.
-
-        Args:
-            text: The string to embed.
-
-        Returns:
-            List of floats of length 384.
+        Embed a single string and return it as a float list.
+        Used internally by VectorIndex at search time.
         """
         return self.get_embeddings([text])[0].tolist()
 
@@ -75,101 +66,135 @@ class LocalEmbedding:
     # Public API
     # ------------------------------------------------------------------
 
-    def get_embeddings(self, texts: list[str]) -> torch.Tensor:
+    def get_embeddings(self, texts: List[str], batch_size: int = 32) -> torch.Tensor:
         """
-        Embed a batch of strings locally.
+        Embed a list of strings locally in micro-batches to prevent OOM.
 
         Args:
-            texts: One or more strings to embed.
+            texts: List of strings to embed.
+            batch_size: Micro-batch size for model inference.
 
         Returns:
             Float32 tensor of shape (N, 384), L2-normalised, on CPU.
         """
-        encoded = self.tokenizer(
-            texts,
-            padding=True,
-            truncation=True,
-            max_length=512,
-            return_tensors="pt",
-        )
-        encoded = {k: v.to(self.device) for k, v in encoded.items()}
+        all_embeddings = []
 
-        with torch.no_grad():
-            output = self.model(**encoded)
+        for i in range(0, len(texts), batch_size):
+            batch_texts = texts[i : i + batch_size]
+            encoded = self.tokenizer(
+                batch_texts,
+                padding=True,
+                truncation=True,
+                max_length=512,
+                return_tensors="pt",
+            )
+            encoded = {k: v.to(self.device) for k, v in encoded.items()}
 
-        embeddings = self._mean_pool(output.last_hidden_state, encoded["attention_mask"])
-        embeddings = torch.nn.functional.normalize(embeddings, p=2, dim=1)
-        return embeddings.cpu()
+            with torch.no_grad():
+                output = self.model(**encoded)
 
-    def build_index(self, chunks: list[str]) -> None:
+            embeddings = self._mean_pool(output.last_hidden_state, encoded["attention_mask"])
+            embeddings = torch.nn.functional.normalize(embeddings, p=2, dim=1)
+            all_embeddings.append(embeddings.cpu())
+
+        if not all_embeddings:
+            return torch.empty((0, 384), dtype=torch.float32)
+
+        return torch.cat(all_embeddings, dim=0)
+
+    def build_index(self, chunks: Union[List[str], List[Dict[str, Any]]]) -> None:
         """
-        Embed all chunks in one batch and store them in the vector index.
-
-        Bulk-embedding is more efficient than embedding one chunk at a time
-        because the GPU processes the whole batch in parallel.
+        Embed all chunks in batches and store them in the vector index.
+        Accepts either raw text strings or rich metadata dictionaries from PdfReader.
 
         Args:
-            chunks: List of text strings to index.
+            chunks: List of text strings or list of chunk metadata dictionaries.
         """
-        embeddings = self.get_embeddings(chunks)
-        
-        # ARCHITECTURE: LE[Local Embeddings (MiniLM)] -->|Vectors| VI[(Vector Index In-Memory)]
-        for chunk, embedding in zip(chunks, embeddings):
-            self.store.add_vector(embedding.tolist(), {"content": chunk})
-        print(f"[LocalEmbedding] Indexed {len(chunks)} chunks.")
+        if not chunks:
+            print("[LocalEmbedding] Warning: No chunks provided to index.")
+            return
 
-    def search(self, question: str, k: int = 3) -> list[tuple[dict, float]]:
+        self.store.clear()
+
+        # Handle both list of dicts and list of strings
+        if isinstance(chunks[0], dict):
+            text_list = [c["content"] for c in chunks]
+            doc_dicts = chunks
+        else:
+            text_list = chunks
+            doc_dicts = [
+                {"chunk_id": idx + 1, "page": 1, "content": text, "doc_name": "document.pdf"}
+                for idx, text in enumerate(chunks)
+            ]
+
+        embeddings = self.get_embeddings(text_list)
+
+        for doc, embedding in zip(doc_dicts, embeddings):
+            self.store.add_vector(embedding.tolist(), doc)
+
+        print(f"[LocalEmbedding] Successfully indexed {len(chunks)} chunks with metadata.")
+
+    def search(self, question: str, k: int = 3) -> List[Tuple[Dict[str, Any], float]]:
         """
-        Find the k chunks most semantically similar to the question.
-
-        The question is embedded automatically by VectorIndex using the
-        _embed_one function provided at initialisation.
-
-        Args:
-            question: Natural-language question string.
-            k:        Number of results to return (default 3).
-
-        Returns:
-            List of (document_dict, distance) tuples, sorted by
-            ascending cosine distance (lower = more similar).
+        Legacy search API: returns list of (document_dict, distance) tuples.
         """
-        # ARCHITECTURE: LE2[Local Embeddings (MiniLM)] -->|Query Vector| VI[(Vector Index In-Memory)]
         return self.store.search(question, k=k)
+
+    def search_with_metadata(self, question: str, k: int = 4) -> List[Dict[str, Any]]:
+        """
+        Enterprise search API: returns structured match dictionaries with page numbers,
+        similarity confidence percentages, and document attribution.
+        """
+        detailed = self.store.search_detailed(question, k=k)
+        results = []
+
+        for item in detailed:
+            doc = item["document"]
+            sim_score = item["similarity_score"]
+            distance = item["distance"]
+
+            results.append({
+                "chunk_id": doc.get("chunk_id", 0),
+                "page": doc.get("page", 1),
+                "content": doc.get("content", ""),
+                "similarity_score": sim_score,
+                "distance": distance,
+                "doc_name": doc.get("doc_name", "document.pdf"),
+                "word_count": doc.get("word_count", len(doc.get("content", "").split())),
+            })
+
+        return results
 
     def get_context(self, question: str, k: int = 3) -> str:
         """
-        Retrieve the most relevant chunks for a question as a single string.
-
-        Intended for RAG: pass the returned string directly as context
-        to your LLM prompt alongside the user's question.
-
-        Args:
-            question: Natural-language question string.
-            k:        Number of chunks to include (default 3).
-
-        Returns:
-            A single string with the k most relevant chunks
-            joined by a separator, ready to embed in a prompt.
+        Legacy context retriever: joined by separator.
         """
         results = self.search(question, k=k)
         return "\n\n---\n\n".join(doc["content"] for doc, _ in results)
 
+    def get_context_with_citations(self, question: str, k: int = 4) -> Tuple[str, List[Dict[str, Any]]]:
+        """
+        Enterprise context retriever: constructs an auditable, cited context block
+        for the LLM prompt while returning the citation metadata for UI rendering.
 
-###############
-# Example usage
-###############
+        Returns:
+            Tuple of:
+            - Formatted context string with explicit [Source N | Page X | Match: Y%] headers
+            - List of citation metadata dictionaries
+        """
+        citations = self.search_with_metadata(question, k=k)
+        context_blocks = []
 
-#from pdf_reader import PdfReader
-#
-#embedder = LocalEmbedding()
-#
-#pdf_reader = PdfReader()
-#chunks = pdf_reader.get_paragraphs()
-#embedder.build_index(chunks)
+        for idx, cite in enumerate(citations, 1):
+            header = f"[EXHIBIT {idx} | Source: {cite['doc_name']} | Page {cite['page']} | Relevance: {cite['similarity_score']}%]"
+            block = f"{header}\n\"{cite['content']}\""
+            context_blocks.append(block)
 
-#results = embedder.search("what is this document all about", k=10)
-#for doc, distance in results:
-#     print(f"Distance: {distance:.4f}")
-#     print(f"Chunk: {doc['content'][:300]}")
-#     print("-" * 80)
-#print(embedder.get_context("what is this document all about", 10))
+        context_str = "\n\n" + ("=" * 40) + "\n\n".join(context_blocks) + "\n\n" + ("=" * 40)
+        return context_str, citations
+
+    def get_all_documents(self) -> List[Dict[str, Any]]:
+        """
+        Returns all stored document chunks for the Document Inspector UI.
+        """
+        return list(self.store.documents)

@@ -140,8 +140,39 @@ class VectorIndex:
             for i, stored_vector in enumerate(self.vectors)
         ]
         distances.sort(key=lambda item: item[0])
-
         return [(doc, dist) for dist, doc in distances[:k]]
+
+    def search_detailed(self, query: Any, k: int = 1) -> List[Dict[str, Any]]:
+        """
+        Return the k documents along with distance and normalized similarity percentage.
+
+        Args:
+            query: Natural-language string or list of floats.
+            k:     Number of results to return.
+
+        Returns:
+            List of dicts containing:
+            {'document': dict, 'distance': float, 'similarity_score': float}
+        """
+        raw_results = self.search(query=query, k=k)
+        detailed = []
+        for doc, dist in raw_results:
+            # Cosine distance to similarity percentage [0.0 - 100.0%]
+            sim_pct = round(max(0.0, 1.0 - dist) * 100.0, 1) if self._distance_metric == "cosine" else round(max(0.0, 1.0 / (1.0 + dist)) * 100.0, 1)
+            detailed.append({
+                "document": doc,
+                "distance": dist,
+                "similarity_score": sim_pct,
+            })
+        return detailed
+
+    def clear(self) -> None:
+        """
+        Clears all stored vectors and documents, resetting the index.
+        """
+        self.vectors = []
+        self.documents = []
+        self._vector_dim = None
 
     # ------------------------------------------------------------------
     # Distance functions
