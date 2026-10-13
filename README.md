@@ -1,130 +1,130 @@
-# RAG AI System — Hybrid Cloud-Local Architecture
+# 🛡️ DocuMind AI — Enterprise Due Diligence & Audit Suite
 
-> A Retrieval-Augmented Generation (RAG) pipeline with a Streamlit chat UI — upload any PDF, ask questions in plain English, and get grounded, streamed answers. Uses local embeddings for speed and privacy, paired with Groq's ultra-fast Cloud API for instant inference without needing a GPU!
+> **A production-grade, domain-specialized Retrieval-Augmented Generation (RAG) platform** engineered for enterprise contract review, quarterly financial analysis, and corporate compliance due diligence. Combines **local vector embeddings** and a **pure-Python vector index** for data privacy with **Groq Cloud API** for serverless, zero-GPU token streaming.
 
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Streamlit](https://img.shields.io/badge/Streamlit-UI-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
-[![Groq](https://img.shields.io/badge/Groq-Cloud_API-F55036?logo=groq&logoColor=white)](https://groq.com/)
-[![Model](https://img.shields.io/badge/Model-Qwen_3.8--27B-a78bfa)](https://huggingface.co/Qwen/Qwen2.5-3B-Instruct)
+[![Streamlit](https://img.shields.io/badge/Streamlit-Executive_UI-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
+[![Groq](https://img.shields.io/badge/Groq-Cloud_API_(ZDR)-F55036?logo=groq&logoColor=white)](https://groq.com/)
+[![Embeddings](https://img.shields.io/badge/Embeddings-Local_MiniLM--L6--v2-10B981)](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2)
+[![LLM](https://img.shields.io/badge/LLM-Qwen_3.8--27B-8B5CF6)](https://groq.com/)
+[![Tests](https://img.shields.io/badge/Tests-8%20Passed-10B981?logo=pytest&logoColor=white)](https://pytest.org/)
 
 ---
 
-## What Is This?
+## 💼 Business Problem & Real-World Use Case
 
-RAG AI System is a hybrid Retrieval-Augmented Generation pipeline that lets you upload a PDF and ask natural-language questions against it — with the answer streamed token-by-token directly to your browser.
+Generic "Chat with your PDF" apps are toy demonstrations: they lack business domain expertise, hallucinate without verifiable citations, lose page numbers, and pose massive corporate privacy risks.
 
-By adopting a hybrid approach, we get the best of both worlds:
-1. **Local Embeddings:** A MiniLM embedding model converts your document into semantic vectors and searches them using a pure-Python in-memory index on your local machine.
-2. **Cloud Inference:** Instead of downloading 7GB of weights and struggling with CUDA/GPU issues, the lightweight `llm_client.py` uses the Groq API to generate answers instantly.
-
-| File | Responsibility |
-|---|---|
-| `main.py` | Streamlit UI — chat interface, file upload, streaming output |
-| `llm_client.py` | `AiModel` — connects to Groq API, streams token output |
-| `local_embedding.py` | `LocalEmbedding` — MiniLM wrapper and vector index interface |
-| `vector_index.py` | `VectorIndex` — pure-stdlib in-memory cosine/Euclidean vector store |
-| `pdf_reader.py` | `PdfReader` — PDF text extraction and paragraph splitting |
+**DocuMind AI solves real enterprise diligence bottlenecks:**
+1. **Contract Review & Legal Risk (M&A / Procurement):** Instantly audits Master Services Agreements (MSAs) and vendor contracts for liability caps, consequential damage waivers, indemnification traps, and termination penalties.
+2. **Financial & Earnings Intelligence (Equity Research / Corporate Finance):** Analyzes 10-K/10-Q SEC filings and earnings releases, extracting revenue, ARR, gross/operating margins, EPS guidance, and macroeconomic risk factors.
+3. **Cybersecurity & Regulatory Compliance (CISO / Audit Committees):** Audits enterprise SOPs against SOC 2, ISO 27001, and GDPR Article 33 requirements, checking MFA mandates, Zero Trust controls, and 72-hour breach notification SLAs.
 
 ---
 
-## Screenshots
+## ✨ Key Enterprise Capabilities
 
-### Upload screen — Ready State
-![Upload screen](application_screenshots/image_2.png)
-The interface highlights the new Privacy Guarantee and the connection to the Groq Cloud API.
+### ⚡ 1-Click Executive Due Diligence & Risk Matrix
+Generate an audit-grade report synthesizing:
+- **Executive Briefing & Metadata:** Parties, governing law, and core transaction purpose.
+- **Critical Risk Heatmap Matrix:** Formatted audit table classifying issues by severity (🔴 High Risk, 🟡 Moderate Warning, 🟢 Compliant).
+- **Financial & Operational Liabilities:** Explicit dollar amounts, payment terms, and delivery milestones.
+- **Regulatory Assessment:** SOC 2, ISO 27001, and GDPR compliance validation.
+- **Auditor Recommendations:** Strategic takeaways for corporate decision-makers before signing or investing.
+- **Export to Markdown:** Instant `.md` report download for stakeholders.
 
-### Active conversation
-![Chat screen](application_screenshots/image.png)
-The assistant streams answers retrieved from the local embedding index, powered by the cloud LLM.
+### 📑 Verifiable Audit Citations & Exhibit Drawers
+Real business decisions require audit trails. Every answer produced by DocuMind includes an interactive **Audit Citations & Exhibits** drawer displaying:
+- Exact **Page Number** (1-indexed)
+- **Chunk ID** and character count
+- **Cosine Relevance Match %**
+- Verifiable document excerpt block
 
-### Architecture
-![Architecture](application_screenshots/mermaid_diagram.png)
+### 🧠 Page-Aware Sliding Window Chunking (Zero Token Truncation)
+Naive paragraph splitting (`\n`) frequently generates chunks exceeding the 512-token limit of MiniLM, resulting in silent truncation and lost clauses. 
+- DocuMind uses a **sliding window chunker** (~1,100 characters per chunk with 180-character overlap) that respects sentence boundaries.
+- Preserves exact page attribution and rich metadata across the entire document.
 
----
-
-## Feature List
-
-### Retrieval-Augmented Generation
-- PDF ingestion with automatic paragraph extraction and whitespace normalisation
-- Batch embedding of all paragraphs in a single pass locally
-- Cosine similarity search over 384-dimensional MiniLM vectors
-- Configurable top-k retrieval to pass the most relevant context chunks to the LLM
-- Strict grounding prompt — the model is instructed to answer only from the provided document text
-
-### Cloud-Powered Streaming Output
-- Uses `groq` SDK for fast, serverless inference.
-- Tokens are yielded directly from the API without blocking the Streamlit main thread.
-- `st.write_stream()` renders tokens progressively as they arrive in the browser.
-
-### Pure-Python Vector Store
-- `VectorIndex` uses no NumPy, FAISS, or external vector database
-- Vectors are L2-normalised at index time; similarity search reduces to a dot-product scan over stored vectors
+### 🔒 Enterprise Privacy & Zero Data Retention (ZDR)
+- **100% Local Vectorization:** Text extraction, sliding chunking, and embedding generation happen strictly on local CPU/GPU using `sentence-transformers/all-MiniLM-L6-v2`.
+- **Pure-Python Vector Store:** In-memory vector index with zero external databases (no Pinecone, Milvus, or external vectors exposed).
+- **ZDR Cloud Inference:** Prompts transmitted via TLS 1.3 to Groq Cloud are processed strictly in volatile memory. Data is **never logged, stored, or used for model retraining**.
 
 ---
 
-## How It Works
-
-1. **PDF → Paragraphs** — `PdfReader` reads every page, normalises whitespace, and splits on paragraph breaks.
-2. **Paragraphs → Vectors** — `LocalEmbedding.build_index()` batch-embeds all paragraphs using a local `all-MiniLM-L6-v2` model.
-3. **Question → Context** — at query time the question is embedded locally and compared against every stored vector by cosine distance; the top-k highest-scoring chunks are retrieved.
-4. **Context + Question → Answer** — `AiModel` wraps the context and question in a strict RAG prompt and fires it off to the **Groq API**, streaming the result back to your screen.
-
----
-
-## Architecture
+## 🏗️ System Architecture
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│                    Streamlit UI (main.py)                 │
-│                                                           │
-│  Sidebar: [Load Model]  [Upload PDF]  [Status]           │
-│  Main:    [Chat input]  →  [Streamed answer]             │
-└─────────────────────────┬────────────────────────────────┘
-                          │
-            ┌─────────────▼──────────────┐
-            │        PDF Ingestion        │
-            │  PdfReader: page text →     │
-            │  clean paragraph list       │
-            └─────────────┬──────────────┘
-                          │
-            ┌─────────────▼──────────────┐
-            │       LocalEmbedding        │
-            │  all-MiniLM-L6-v2 (LOCAL)  │
-            │  batch embed → 384-dim     │
-            │  L2-normalised vectors      │
-            └─────────────┬──────────────┘
-                          │
-            ┌─────────────▼──────────────┐
-            │        VectorIndex          │
-            │  in-memory cosine store     │
-            │  (pure Python stdlib)       │
-            └─────────────┬──────────────┘
-                          │ top-k chunks
-            ┌─────────────▼──────────────┐
-            │       AiModel (Client)      │
-            │       Groq API (CLOUD)      │
-            │  Sends RAG prompt over HTTP │
-            └─────────────┬──────────────┘
-                          │ token stream
-            ┌─────────────▼──────────────┐
-            │      st.write_stream()      │
-            │  → live tokens in browser   │
-            └─────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                 DocuMind AI — Modern Executive Dark SaaS UI                 │
+│  [Domain Selector]  [Enterprise Samples / Custom Upload]  [Risk Matrix/Chat]│
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │
+                         ┌─────────────▼─────────────┐
+                         │   Page-Aware PDF Parser   │
+                         │   (pypdf + Sliding Chunk) │
+                         │  Tracks Page Numbers &    │
+                         │  Sanitizes Injection Tokens│
+                         └─────────────┬─────────────┘
+                                       │
+         ┌─────────────────────────────┴─────────────────────────────┐
+         │                                                           │
+┌────────▼─────────────────┐                                ┌────────▼─────────────────┐
+│  Local Embedding Engine  │                                │   Pure-Python Vector     │
+│  all-MiniLM-L6-v2        │                                │   In-Memory Index        │
+│  (384-dim L2 Normalised) │ ── Batch Vector Embeddings ──> │   Cosine Distance Scan   │
+│  Runs 100% Locally       │                                │   Zero External DBs      │
+└──────────────────────────┘                                └────────────┬─────────────┘
+                                                                         │
+                                                               Top-k Cited Exhibits
+                                                                         │
+                                                            ┌────────────▼─────────────┐
+                                                            │   Enterprise LLM Client  │
+                                                            │   (Domain System Prompts)│
+                                                            └────────────┬─────────────┘
+                                                                         │
+                                                            ┌────────────▼─────────────┐
+                                                            │   Groq Cloud API         │
+                                                            │   Qwen 3.8-27B           │
+                                                            │   Zero Data Retention    │
+                                                            │   (Tokens Streamed Live) │
+                                                            └──────────────────────────┘
 ```
 
 ---
 
-## Installation
+## 📁 Repository Structure
 
-### Prerequisites
+```
+RAG-system/
+├── main.py                     # Streamlit Executive Dark SaaS Application
+├── llm_client.py               # Domain prompts, Groq LLM client & Executive Audit generator
+├── local_embedding.py          # Local MiniLM model, batch embedding & citation engine
+├── vector_index.py             # Pure Python stdlib in-memory cosine/Euclidean vector store
+├── pdf_reader.py               # Page-aware PDF parser, sliding window chunker & sanitizer
+├── sample_documents/           # Pre-packaged enterprise test documents
+│   ├── saas_master_services_agreement.pdf    # B2B SaaS MSA (Legal & Contracts)
+│   ├── q1_corporate_earnings_report.pdf      # Q1 10-Q Earnings Release (Financials)
+│   └── corporate_cybersecurity_policy.pdf    # Security & AI Governance SOP (Compliance)
+├── scripts/
+│   └── create_sample_pdfs.py   # Script to regenerate sample PDFs
+├── tests/
+│   └── test_rag_pipeline.py    # Pytest test suite (8 unit tests)
+├── audit_notes/
+│   └── project_improvements.md # Engineering audit & resolved architectural items
+├── requirements.txt            # Python dependencies
+└── .env.example                # Template for API keys
+```
 
-| Requirement | Notes |
-|---|---|
-| Python 3.10+ | Earlier versions not tested |
-| Groq account | **Required** for the `.env` `GROQ_API_KEY` to use the free cloud API |
+---
 
-### Setup
+## 🚀 Quick Start Guide
 
+### 1. Prerequisites
+- Python 3.10+
+- Free Groq Cloud API key from [console.groq.com/keys](https://console.groq.com/keys)
+
+### 2. Installation
 ```bash
 # Clone the repository
 git clone https://github.com/PrinceBadru/RAG-system.git
@@ -132,52 +132,92 @@ cd RAG-system
 
 # Create and activate a virtual environment
 python -m venv .venv
-# Windows (PowerShell/Command Prompt)
-.\.venv\Scripts\activate   
-# macOS / Linux
-# source .venv/bin/activate     
+# On Windows (PowerShell):
+.\.venv\Scripts\Activate.ps1
+# On macOS / Linux:
+# source .venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
 ```
 
-### Add your API keys
-
+### 3. Configure API Key
 Create a `.env` file in the project root:
-
-```
+```env
 GROQ_API_KEY=gsk_your_groq_api_key_here
 ```
 
-Get a free token at [console.groq.com/keys](https://console.groq.com/keys). This is strictly required to query the cloud models. Note: You might also need a Hugging Face token in the `.env` if your local embeddings require authenticated downloads.
+### 4. Run the Application
 
----
+Choose whichever method best fits your workflow:
 
-## Usage
+#### ⚡ Method 1: 1-Click Launchers (Easiest on Windows)
+- **Command Prompt / Windows Explorer:** Double-click or run [`run_app.bat`](file:///c:/Users/user/Desktop/Personal%20Projects/RAG-system/run_app.bat)
+  ```cmd
+  run_app.bat
+  ```
+- **PowerShell:** Run [`run_app.ps1`](file:///c:/Users/user/Desktop/Personal%20Projects/RAG-system/run_app.ps1)
+  ```powershell
+  .\run_app.ps1
+  ```
 
-```bash
-# If your virtual environment is activated:
-streamlit run main.py
+#### 🛠️ Method 2: Direct Execution via Project Python (No activation needed)
+Bypasses Windows PATH issues completely by invoking the virtual environment directly:
+- **Windows (PowerShell / CMD):**
+  ```powershell
+  .\.venv\Scripts\python.exe -m streamlit run main.py
+  ```
+- **macOS / Linux:**
+  ```bash
+  ./.venv/bin/python -m streamlit run main.py
+  ```
 
-# Or run it directly without activating the environment (Windows):
-.\.venv\Scripts\python.exe -m streamlit run main.py
+#### 💻 Method 3: Standard Activation
+- **Windows (PowerShell):**
+  ```powershell
+  .\.venv\Scripts\Activate.ps1
+  streamlit run main.py
+  ```
+- **Windows (Command Prompt):**
+  ```cmd
+  .\.venv\Scripts\activate.bat
+  streamlit run main.py
+  ```
+- **macOS / Linux:**
+  ```bash
+  source .venv/bin/activate
+  streamlit run main.py
+  ```
+
+Once launched, Streamlit will automatically open or display your local URL at:
+```
+http://localhost:8501
 ```
 
-Streamlit will print a local URL (default `http://localhost:8501`). Open it in your browser.
-
-### Basic workflow
-
-1. Wait for **"LLM ready"** in the sidebar.
-2. Drag and drop any PDF onto the uploader, or click **Browse**.
-3. Wait for **"Document ready — N paragraphs indexed"** in the sidebar.
-4. Type your question in the chat input at the bottom and press Enter.
-5. The answer streams token-by-token. Ask follow-up questions freely — the index is cached.
-6. Upload a new PDF to start a fresh conversation.
+> [!TIP]
+> **Troubleshooting `'streamlit' is not recognized`**:
+> If you see `'streamlit' is not recognized as an internal or external command`, it means your virtual environment is not currently activated in your shell or global Python scripts are not on your Windows `PATH`. Use **Method 1 (`run_app.bat` / `.\run_app.ps1`)** or **Method 2 (`.\.venv\Scripts\python.exe -m streamlit run main.py`)** to run without needing to touch Windows environment variables.
 
 ---
 
-## Limitations
+## 🧪 Running Unit Tests
 
-- **Cloud Data Transfer & Privacy** — Your PDF text chunks leave your machine to be processed by the Groq API. However, we rely on **Zero Data Retention (ZDR)** API policies, meaning your data is encrypted in transit (HTTPS), processed in memory, and instantly deleted without being stored or used for training.
-- **Single document at a time** — the index holds one PDF; there is no multi-document or cross-document Q&A.
-- **In-memory index only** — `VectorIndex` is not persisted to disk; re-uploading the same PDF re-embeds it from scratch on every run.
+Run the test suite using either the direct venv Python:
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests/test_rag_pipeline.py -v
+```
+Or after activating your virtual environment:
+```bash
+pytest tests/test_rag_pipeline.py -v
+```
+All 8 unit tests validate:
+- In-memory vector distance metrics and dimension mismatch guards
+- Page-aware extraction and sliding-window overlap
+- Disallowed LLM control token sanitization (`<|end|>`, `<|system|>`)
+- Local MiniLM embedding generation and metadata preservation
+- Grounded prompt construction and exhibit citations
+
+---
+
+## 📄 License
+MIT License. Created by Prince Badru.
