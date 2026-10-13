@@ -5,3 +5,4 @@
 __pycache__
 unused
 audit_notes/
+.pytest_cache/
